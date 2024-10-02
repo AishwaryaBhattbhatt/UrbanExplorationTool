@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -11,7 +11,10 @@
         <div id="map"></div>
         <div id="hexGrid"></div>
     </div>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4"></script>
+    <div id="debug">
+        <p id="status">Status: Initializing...</p>
+    </div>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap" async defer></script>
     <script src="app.js"></script>
 </body>
 </html>
