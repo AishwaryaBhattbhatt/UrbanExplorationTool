@@ -3,131 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map Exploration App (Visible Hexagons)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/h3-js/3.7.2/h3-js.umd.min.js"></script>
-    <style>
-        body, html {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-        }
-        #hexOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: all;
-        }
-        #startButton {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 10;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
+    <title>Hexplore: Gamified Map Exploration</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="map"></div>
-    <div id="hexOverlay"></div>
-    <button id="startButton">Start Exploring</button>
-
-    <script>
-        let map;
-        let hexGrid = new Set();
-        const hexResolution = 8;
-
-        function initMap() {
-            map = new google.maps.Map(document.getElementById('map'), {
-                center: {lat: 0, lng: 0},
-                zoom: 2,
-                disableDefaultUI: true,
-                gestureHandling: 'none'
-            });
-
-            document.getElementById('startButton').addEventListener('click', startExploring);
-        }
-
-        function startExploring() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    initializeGrid,
-                    handleLocationError,
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 0
-                    }
-                );
-            } else {
-                alert("Geolocation is not supported by this browser.");
-            }
-        }
-
-        function initializeGrid(position) {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            map.setCenter({lat, lng});
-            map.setZoom(18);
-
-            const centerHex = h3.latLngToCell(lat, lng, hexResolution);
-            const hexRing = h3.gridDisk(centerHex, 5);
-
-            const hexOverlay = document.getElementById('hexOverlay');
-            hexRing.forEach(hexId => {
-                drawHexagon(hexId, hexOverlay);
-            });
-        }
-
-        function drawHexagon(h3Index, container) {
-            const hexBoundary = h3.cellToBoundary(h3Index);
-            const hexSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            hexSvg.setAttribute('width', '100%');
-            hexSvg.setAttribute('height', '100%');
-            hexSvg.style.position = 'absolute';
-            hexSvg.style.top = '0';
-            hexSvg.style.left = '0';
-            hexSvg.style.pointerEvents = 'none';
-
-            const hexPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const pathData = hexBoundary.map((point, i) => {
-                const {x, y} = map.getProjection().fromLatLngToPoint(new google.maps.LatLng(point[0], point[1]));
-                return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-            }).join(' ') + ' Z';
-
-            hexPath.setAttribute('d', pathData);
-            hexPath.setAttribute('fill', 'rgba(128, 128, 128, 0.5)');
-            hexPath.setAttribute('stroke', 'white');
-            hexPath.setAttribute('stroke-width', '2');
-            hexPath.style.pointerEvents = 'all';
-            hexPath.style.cursor = 'pointer';
-
-            hexPath.addEventListener('click', () => revealHexagon(h3Index, hexPath));
-
-            hexSvg.appendChild(hexPath);
-            container.appendChild(hexSvg);
-        }
-
-        function revealHexagon(h3Index, hexPath) {
-            if (!hexGrid.has(h3Index)) {
-                hexGrid.add(h3Index);
-                hexPath.setAttribute('fill', 'rgba(255, 0, 0, 0.2)');
-                hexPath.setAttribute('stroke', 'red');
-            }
-        }
-
-        function handleLocationError(error) {
-            console.error("Geolocation error: " + error.message);
-            alert("Unable to retrieve your location. Please ensure you've granted location permissions and try again.");
-        }
-    </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap" async defer></script>
+    <div id="app">
+        <div id="map"></div>
+        <div id="hexGrid"></div>
+    </div>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4"></script>
+    <script src="app.js"></script>
 </body>
 </html>
