@@ -1,5 +1,5 @@
 let map;
-const hexSize = 30; // Adjust this value to change the size of hexagons
+let hexSize = 30; // We'll adjust this based on screen size
 
 function initMap() {
     updateStatus("Initializing map...");
@@ -47,23 +47,17 @@ function requestGeolocation() {
 function createHexGrid() {
     updateStatus("Creating hex grid...");
     const hexGrid = document.getElementById("hexGrid");
+    hexGrid.innerHTML = ''; // Clear existing grid
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", "100%");
     svg.setAttribute("height", "100%");
     hexGrid.appendChild(svg);
 
-    const mapBounds = map.getBounds();
-    const ne = mapBounds.getNorthEast();
-    const sw = mapBounds.getSouthWest();
+    // Adjust hexSize based on screen width
+    hexSize = Math.max(15, Math.min(30, window.innerWidth / 20));
 
     const hexHeight = hexSize * 2;
     const hexWidth = Math.sqrt(3) / 2 * hexHeight;
-
-    const projection = map.getProjection();
-    const topLeft = projection.fromLatLngToPoint(new google.maps.LatLng(ne.lat(), sw.lng()));
-    const bottomRight = projection.fromLatLngToPoint(new google.maps.LatLng(sw.lat(), ne.lng()));
-
-    const scale = Math.pow(2, map.getZoom());
 
     for (let x = 0; x < window.innerWidth; x += hexWidth * 0.75) {
         for (let y = 0; y < window.innerHeight; y += hexHeight * 0.75) {
@@ -72,7 +66,7 @@ function createHexGrid() {
         }
     }
 
-    updateStatus("Hex grid created. Click on hexagons to reveal the map.");
+    updateStatus("Hex grid created. Tap on hexagons to reveal the map.");
 }
 
 function createHexagon(x, y) {
@@ -81,6 +75,7 @@ function createHexagon(x, y) {
     hexagon.setAttribute("points", points);
     hexagon.setAttribute("class", "hexagon");
     hexagon.addEventListener("click", revealHexagon);
+    hexagon.addEventListener("touchstart", revealHexagon);
     return hexagon;
 }
 
@@ -96,6 +91,7 @@ function calculateHexPoints(x, y) {
 }
 
 function revealHexagon(event) {
+    event.preventDefault(); // Prevent default touch behavior
     event.target.classList.add("revealed");
     updateStatus("Hexagon revealed!");
 }
@@ -104,5 +100,8 @@ function updateStatus(message) {
     console.log(message);
     document.getElementById("status").textContent = "Status: " + message;
 }
+
+// Add event listener for window resize
+window.addEventListener('resize', createHexGrid);
 
 // Remove window.onload and let the Google Maps API callback handle initialization

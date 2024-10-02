@@ -3,6 +3,7 @@ body, html {
     padding: 0;
     height: 100%;
     width: 100%;
+    overflow: hidden;
 }
 
 #app {
@@ -31,9 +32,10 @@ body, html {
     stroke-width: 1px;
     pointer-events: all;
     cursor: pointer;
+    touch-action: manipulation;
 }
 
-.hexagon:hover {
+.hexagon:hover, .hexagon:active {
     fill: rgba(100, 100, 100, 0.9);
 }
 
@@ -51,4 +53,13 @@ body, html {
     border-radius: 5px;
     font-family: Arial, sans-serif;
     z-index: 1000;
+    font-size: 14px;
+    max-width: 80%;
+}
+
+@media (max-width: 600px) {
+    #debug {
+        font-size: 12px;
+        padding: 5px;
+    }
 }
