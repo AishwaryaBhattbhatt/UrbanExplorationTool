@@ -21,7 +21,9 @@ function initMap() {
                         }
                     ]
                 });
-                createHexGrid();
+                
+                // Wait for the map to load before creating the hex grid
+                google.maps.event.addListenerOnce(map, 'idle', createHexGrid);
             },
             () => {
                 alert("Error: The Geolocation service failed.");
@@ -33,21 +35,26 @@ function initMap() {
 }
 
 function createHexGrid() {
+    const hexGrid = document.getElementById("hexGrid");
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", "100%");
     svg.setAttribute("height", "100%");
-    document.getElementById("hexGrid").appendChild(svg);
+    hexGrid.appendChild(svg);
 
-    const bounds = map.getBounds();
-    const ne = bounds.getNorthEast();
-    const sw = bounds.getSouthWest();
+    const mapBounds = map.getBounds();
+    const ne = mapBounds.getNorthEast();
+    const sw = mapBounds.getSouthWest();
 
     const hexHeight = hexSize * 2;
     const hexWidth = Math.sqrt(3) / 2 * hexHeight;
 
-    for (let x = 0; x < window.innerWidth; x += hexWidth * 0.75) {
-        for (let y = 0; y < window.innerHeight; y += hexHeight) {
-            const hexagon = createHexagon(x, y);
+    const projection = map.getProjection();
+    const topLeft = projection.fromLatLngToPoint(new google.maps.LatLng(ne.lat(), sw.lng()));
+    const bottomRight = projection.fromLatLngToPoint(new google.maps.LatLng(sw.lat(), ne.lng()));
+
+    for (let x = topLeft.x; x < bottomRight.x; x += hexWidth * 0.75) {
+        for (let y = topLeft.y; y < bottomRight.y; y += hexHeight * 0.75) {
+            const hexagon = createHexagon(x - topLeft.x, y - topLeft.y);
             svg.appendChild(hexagon);
         }
     }
