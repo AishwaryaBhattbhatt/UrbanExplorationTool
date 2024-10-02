@@ -1,5 +1,6 @@
 let map;
-let hexSize = 30; // We'll adjust this based on screen size
+let hexSize = 30;
+let hexGrid;
 
 function initMap() {
     updateStatus("Initializing map...");
@@ -19,6 +20,55 @@ function initMap() {
         ]
     });
 
+    hexGrid = new google.maps.OverlayView();
+    hexGrid.onAdd = function() {
+        const svg = d3.select(this.getPanes().overlayLayer).append("svg")
+            .attr("id", "hexSvg")
+            .style("position", "absolute");
+        this.svg = svg;
+    };
+
+    hexGrid.draw = function() {
+        updateStatus("Drawing hex grid...");
+        this.svg.selectAll("*").remove();
+        const overlayProjection = this.getProjection();
+        const bounds = map.getBounds();
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const topLeft = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(ne.lat(), sw.lng()));
+        const bottomRight = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(sw.lat(), ne.lng()));
+
+        const width = bottomRight.x - topLeft.x;
+        const height = bottomRight.y - topLeft.y;
+
+        this.svg.style("left", topLeft.x + "px")
+            .style("top", topLeft.y + "px")
+            .style("width", width + "px")
+            .style("height", height + "px");
+
+        const hexbin = d3.hexbin()
+            .radius(hexSize)
+            .extent([[0, 0], [width, height]]);
+
+        const points = d3.range(0, width, hexSize)
+            .flatMap(x => d3.range(0, height, hexSize * Math.sqrt(3) / 2)
+                .map(y => [x, y]));
+
+        const hexagons = this.svg.selectAll("path")
+            .data(hexbin(points))
+            .enter().append("path")
+            .attr("d", d => "M" + d.x + "," + d.y + hexbin.hexagon())
+            .attr("class", "hexagon")
+            .on("click", revealHexagon)
+            .on("touchstart", revealHexagon);
+    };
+
+    hexGrid.setMap(map);
+
+    google.maps.event.addListener(map, 'bounds_changed', () => {
+        hexGrid.draw();
+    });
+
     updateStatus("Map initialized. Requesting geolocation...");
     requestGeolocation();
 }
@@ -31,68 +81,22 @@ function requestGeolocation() {
                 const { latitude, longitude } = position.coords;
                 map.setCenter({ lat: latitude, lng: longitude });
                 map.setZoom(15);
-                createHexGrid();
+                hexGrid.draw();
             },
             (error) => {
                 updateStatus("Geolocation error: " + error.message);
-                createHexGrid(); // Create hex grid even if geolocation fails
+                hexGrid.draw();
             }
         );
     } else {
         updateStatus("Geolocation not supported by this browser.");
-        createHexGrid(); // Create hex grid even if geolocation is not supported
+        hexGrid.draw();
     }
-}
-
-function createHexGrid() {
-    updateStatus("Creating hex grid...");
-    const hexGrid = document.getElementById("hexGrid");
-    hexGrid.innerHTML = ''; // Clear existing grid
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "100%");
-    hexGrid.appendChild(svg);
-
-    // Adjust hexSize based on screen width
-    hexSize = Math.max(15, Math.min(30, window.innerWidth / 20));
-
-    const hexHeight = hexSize * 2;
-    const hexWidth = Math.sqrt(3) / 2 * hexHeight;
-
-    for (let x = 0; x < window.innerWidth; x += hexWidth * 0.75) {
-        for (let y = 0; y < window.innerHeight; y += hexHeight * 0.75) {
-            const hexagon = createHexagon(x, y);
-            svg.appendChild(hexagon);
-        }
-    }
-
-    updateStatus("Hex grid created. Tap on hexagons to reveal the map.");
-}
-
-function createHexagon(x, y) {
-    const hexagon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-    const points = calculateHexPoints(x, y);
-    hexagon.setAttribute("points", points);
-    hexagon.setAttribute("class", "hexagon");
-    hexagon.addEventListener("click", revealHexagon);
-    hexagon.addEventListener("touchstart", revealHexagon);
-    return hexagon;
-}
-
-function calculateHexPoints(x, y) {
-    const points = [];
-    for (let i = 0; i < 6; i++) {
-        const angle = 2 * Math.PI / 6 * i;
-        const hx = x + hexSize * Math.cos(angle);
-        const hy = y + hexSize * Math.sin(angle);
-        points.push(`${hx},${hy}`);
-    }
-    return points.join(" ");
 }
 
 function revealHexagon(event) {
-    event.preventDefault(); // Prevent default touch behavior
-    event.target.classList.add("revealed");
+    event.preventDefault();
+    d3.select(this).classed("revealed", true);
     updateStatus("Hexagon revealed!");
 }
 
@@ -101,7 +105,8 @@ function updateStatus(message) {
     document.getElementById("status").textContent = "Status: " + message;
 }
 
-// Add event listener for window resize
-window.addEventListener('resize', createHexGrid);
-
-// Remove window.onload and let the Google Maps API callback handle initialization
+// Adjust hexSize based on zoom level
+google.maps.event.addListener(map, 'zoom_changed', function() {
+    hexSize = Math.max(15, Math.min(30, 30 * Math.pow(2, map.getZoom() - 15)));
+    hexGrid.draw();
+});
