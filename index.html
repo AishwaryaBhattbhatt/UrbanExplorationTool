@@ -3,22 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map Exploration App (Click to Reveal)</title>
+    <title>Map Exploration App (With Geolocation Permission)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/h3-js/3.7.2/h3-js.umd.min.js"></script>
     <style>
-        #map {
-            height: 100vh;
-            width: 100%;
-        }
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
+        body, html {
             height: 100%;
-            background-color: rgba(128, 128, 128, 0.9);
-            z-index: 1;
-            pointer-events: none;
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
         }
         #startButton {
             position: absolute;
@@ -33,18 +28,17 @@
 </head>
 <body>
     <div id="map"></div>
-    <div id="overlay"></div>
     <button id="startButton">Start Exploring</button>
 
     <script>
         let map;
         let hexGrid = new Set();
-        const hexResolution = 9; // Adjust this for different grid sizes
+        const hexResolution = 8; // Adjust this for different grid sizes
 
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
                 center: {lat: 0, lng: 0},
-                zoom: 18,
+                zoom: 2, // Start with a zoomed-out view
                 disableDefaultUI: true
             });
 
@@ -53,7 +47,15 @@
 
         function startExploring() {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(initializeGrid, handleLocationError);
+                navigator.geolocation.getCurrentPosition(
+                    initializeGrid,
+                    handleLocationError,
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
             } else {
                 alert("Geolocation is not supported by this browser.");
             }
@@ -63,9 +65,10 @@
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
             map.setCenter({lat, lng});
+            map.setZoom(18); // Zoom in after getting location
 
             const centerHex = h3.latLngToCell(lat, lng, hexResolution);
-            const hexRing = h3.gridDisk(centerHex, 10); // Creates a grid of hexagons
+            const hexRing = h3.gridDisk(centerHex, 5); // Creates a grid of hexagons
 
             hexRing.forEach(hexId => {
                 drawHexagon(hexId);
@@ -82,51 +85,29 @@
                 strokeOpacity: 1,
                 strokeWeight: 2,
                 fillColor: "#808080",
-                fillOpacity: 0.5,
+                fillOpacity: 0.7,
                 map: map
             });
 
             hexagon.addListener('click', function() {
-                revealHexagon(h3Index);
+                revealHexagon(h3Index, hexagon);
             });
         }
 
-        function revealHexagon(h3Index) {
+        function revealHexagon(h3Index, hexagon) {
             if (!hexGrid.has(h3Index)) {
                 hexGrid.add(h3Index);
-                const hexBoundary = h3.cellToBoundary(h3Index);
-                const hexCoords = hexBoundary.map(([lat, lng]) => ({lat, lng}));
-
-                new google.maps.Polygon({
-                    paths: hexCoords,
-                    strokeColor: "#FF0000",
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
+                hexagon.setOptions({
                     fillColor: "#FF0000",
-                    fillOpacity: 0.35,
-                    map: map
-                });
-
-                // Remove the revealed area from the overlay
-                const overlayPath = [
-                    {lat: -90, lng: -180},
-                    {lat: -90, lng: 180},
-                    {lat: 90, lng: 180},
-                    {lat: 90, lng: -180}
-                ].concat(hexCoords);
-
-                new google.maps.Polygon({
-                    paths: [overlayPath],
-                    strokeOpacity: 0,
-                    fillColor: "#808080",
-                    fillOpacity: 0.9,
-                    map: map
+                    fillOpacity: 0.2,
+                    strokeColor: "#FF0000"
                 });
             }
         }
 
         function handleLocationError(error) {
-            console.error("Error: " + error.message);
+            console.error("Geolocation error: " + error.message);
+            alert("Unable to retrieve your location. Please ensure you've granted location permissions and try again.");
         }
     </script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap" async defer></script>
