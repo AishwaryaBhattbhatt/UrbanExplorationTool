@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map Exploration App (With Geolocation Permission)</title>
+    <title>Map Exploration App (Full Overlay)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/h3-js/3.7.2/h3-js.umd.min.js"></script>
     <style>
         body, html {
@@ -15,11 +15,20 @@
             height: 100%;
             width: 100%;
         }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(128, 128, 128, 0.8);
+            pointer-events: none;
+        }
         #startButton {
             position: absolute;
             top: 20px;
             left: 20px;
-            z-index: 2;
+            z-index: 10;
             padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
@@ -28,6 +37,7 @@
 </head>
 <body>
     <div id="map"></div>
+    <div id="overlay"></div>
     <button id="startButton">Start Exploring</button>
 
     <script>
@@ -38,7 +48,7 @@
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
                 center: {lat: 0, lng: 0},
-                zoom: 2, // Start with a zoomed-out view
+                zoom: 2,
                 disableDefaultUI: true
             });
 
@@ -65,10 +75,10 @@
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
             map.setCenter({lat, lng});
-            map.setZoom(18); // Zoom in after getting location
+            map.setZoom(18);
 
             const centerHex = h3.latLngToCell(lat, lng, hexResolution);
-            const hexRing = h3.gridDisk(centerHex, 5); // Creates a grid of hexagons
+            const hexRing = h3.gridDisk(centerHex, 5);
 
             hexRing.forEach(hexId => {
                 drawHexagon(hexId);
@@ -85,7 +95,7 @@
                 strokeOpacity: 1,
                 strokeWeight: 2,
                 fillColor: "#808080",
-                fillOpacity: 0.7,
+                fillOpacity: 0,
                 map: map
             });
 
@@ -99,8 +109,23 @@
                 hexGrid.add(h3Index);
                 hexagon.setOptions({
                     fillColor: "#FF0000",
-                    fillOpacity: 0.2,
+                    fillOpacity: 0,
                     strokeColor: "#FF0000"
+                });
+
+                // Create a hole in the overlay
+                const hexBoundary = h3.cellToBoundary(h3Index);
+                const hexCoords = hexBoundary.map(([lat, lng]) => ({lat, lng}));
+                
+                new google.maps.Polygon({
+                    paths: [
+                        [{lat: -90, lng: -180}, {lat: -90, lng: 180}, {lat: 90, lng: 180}, {lat: 90, lng: -180}],
+                        hexCoords
+                    ],
+                    strokeOpacity: 0,
+                    fillColor: "#808080",
+                    fillOpacity: 0.8,
+                    map: map
                 });
             }
         }
