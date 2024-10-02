@@ -1,0 +1,118 @@
+
+    
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Map Exploration App (Small Scale)</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/h3-js/3.7.2/h3-js.umd.min.js"></script>
+        <style>
+            #map {
+                height: 100vh;
+                width: 100%;
+            }
+            #overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(128, 128, 128, 0.9);
+                backdrop-filter: blur(5px);
+                z-index: 1;
+                pointer-events: none;
+            }
+            #startButton {
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                z-index: 2;
+                padding: 10px 20px;
+                font-size: 16px;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <div id="overlay"></div>
+        <button id="startButton">Start Exploring</button>
+    
+        <script>
+            let map;
+            let hexGrid = new Set();
+            const hexRadius = 0.0005; // Approximately 1m diameter
+    
+            function initMap() {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: {lat: 0, lng: 0},
+                    zoom: 21, // Increased zoom level for smaller area
+                    disableDefaultUI: true
+                });
+    
+                document.getElementById('startButton').addEventListener('click', startExploring);
+            }
+    
+            function startExploring() {
+                if (navigator.geolocation) {
+                    navigator.geolocation.watchPosition(updatePosition, handleLocationError, {
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    });
+                } else {
+                    alert("Geolocation is not supported by this browser.");
+                }
+            }
+    
+            function updatePosition(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                map.setCenter({lat, lng});
+    
+                const h3Index = h3.latLngToCell(lat, lng, 15); // Resolution 15 for very small hexagons
+                if (!hexGrid.has(h3Index)) {
+                    hexGrid.add(h3Index);
+                    revealHexagon(h3Index);
+                }
+            }
+    
+            function revealHexagon(h3Index) {
+                const hexBoundary = h3.cellToBoundary(h3Index);
+                const hexCoords = hexBoundary.map(([lat, lng]) => ({lat, lng}));
+    
+                new google.maps.Polygon({
+                    paths: hexCoords,
+                    strokeColor: "#FF0000",
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: "#FF0000",
+                    fillOpacity: 0.35,
+                    map: map
+                });
+    
+                // Remove the revealed area from the overlay
+                const overlayPath = [
+                    {lat: -90, lng: -180},
+                    {lat: -90, lng: 180},
+                    {lat: 90, lng: 180},
+                    {lat: 90, lng: -180}
+                ].concat(hexCoords);
+    
+                new google.maps.Polygon({
+                    paths: [overlayPath],
+                    strokeOpacity: 0,
+                    fillColor: "#808080",
+                    fillOpacity: 0.9,
+                    map: map
+                });
+            }
+    
+            function handleLocationError(error) {
+                console.error("Error: " + error.message);
+            }
+        </script>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap" async defer></script>
+    </body>
+    </html>
