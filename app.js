@@ -59,8 +59,8 @@ function initMap() {
             .enter().append("path")
             .attr("d", d => "M" + d.x + "," + d.y + hexbin.hexagon())
             .attr("class", "hexagon")
-            .on("click", revealHexagon)
-            .on("touchstart", revealHexagon);
+            .on("mousedown", handleHexagonInteraction)
+            .on("touchstart", handleHexagonInteraction);
     };
 
     hexGrid.setMap(map);
@@ -94,7 +94,8 @@ function requestGeolocation() {
     }
 }
 
-function revealHexagon(event, d) {
+function handleHexagonInteraction(event) {
+    event.preventDefault();
     event.stopPropagation();
     d3.select(this).classed("revealed", true);
     updateStatus("Hexagon revealed!");
