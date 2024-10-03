@@ -5,13 +5,14 @@ var revealedHexagons = new Set();
 var userMarker;
 var watchId;
 var exploring = false;
+var baseZoom = 18;
 
 function initMap() {
     updateStatus("Initializing map...");
     try {
         map = new google.maps.Map(document.getElementById("map"), {
             center: { lat: 0, lng: 0 },
-            zoom: 18,
+            zoom: baseZoom,
             disableDefaultUI: true,
             zoomControl: true,
             styles: [
@@ -61,7 +62,7 @@ function initMap() {
 
             var center = map.getCenter();
             var pixelsPerMeter = this.getPixelsPerMeter(center.lat());
-            var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter;
+            var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter * Math.pow(2, map.getZoom() - baseZoom);
 
             var hexbin = d3.hexbin()
                 .radius(hexRadius)
@@ -86,7 +87,7 @@ function initMap() {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
 
-            updateStatus("Hex grid drawn.");
+            updateStatus("Hex grid drawn. Total hexagons: " + hexagons.size());
         };
 
         hexGrid.getPixelsPerMeter = function(latitude) {
@@ -105,9 +106,22 @@ function initMap() {
             hexGrid.draw();
         });
 
-        document.getElementById('startExploring').addEventListener('click', startExploring);
-        document.getElementById('refreshExploring').addEventListener('click', refreshExploring);
+        var startExploringBtn = document.getElementById('startExploring');
+        var refreshExploringBtn = document.getElementById('refreshExploring');
 
+        if (startExploringBtn) {
+            startExploringBtn.addEventListener('click', startExploring);
+        } else {
+            updateStatus("Error: Start Exploring button not found");
+        }
+
+        if (refreshExploringBtn) {
+            refreshExploringBtn.addEventListener('click', refreshExploring);
+        } else {
+            updateStatus("Error: Refresh Exploring button not found");
+        }
+
+        updateStatus("Map initialization complete.");
     } catch (error) {
         updateStatus("Error initializing map: " + error.message);
         console.error("Map initialization error:", error);
@@ -129,6 +143,11 @@ function requestGeolocation() {
             function(error) {
                 updateStatus("Geolocation error: " + error.message);
                 hexGrid.draw();
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 0
             }
         );
     } else {
@@ -155,15 +174,17 @@ function placeUserMarker(latLng) {
             title: "Your Location"
         });
     }
+    updateStatus("User marker placed at: " + latLng.lat() + ", " + latLng.lng());
 }
 
 function startExploring() {
     if (!exploring) {
         exploring = true;
         updateStatus("Started exploring. Current and new locations will reveal hexagons.");
-        // Reveal the hexagon at the current location
         if (userMarker) {
             revealHexagonAtPosition(userMarker.getPosition());
+        } else {
+            updateStatus("Warning: User marker not set. Unable to reveal initial hexagon.");
         }
         watchId = navigator.geolocation.watchPosition(updateUserPosition, handleLocationError, {
             enableHighAccuracy: true,
@@ -200,16 +221,22 @@ function updateUserPosition(position) {
     if (exploring) {
         revealHexagonAtPosition(latLng);
     }
+    updateStatus("User position updated: " + latLng.lat() + ", " + latLng.lng());
 }
 
 function revealHexagonAtPosition(latLng) {
-    if (!hexGrid.getProjection()) return;  // Exit if projection is not ready
+    if (!hexGrid.getProjection()) {
+        updateStatus("Error: Hex grid projection not ready");
+        return;
+    }
     var pixel = hexGrid.getProjection().fromLatLngToContainerPixel(latLng);
     var hexagon = document.elementFromPoint(pixel.x, pixel.y);
     if (hexagon && hexagon.id && hexagon.id.startsWith("hex-")) {
         hexagon.classList.add("revealed");
         revealedHexagons.add(hexagon.id);
         updateStatus("Revealed hexagon: " + hexagon.id);
+    } else {
+        updateStatus("No hexagon found at position: " + latLng.lat() + ", " + latLng.lng());
     }
 }
 
@@ -222,5 +249,10 @@ function updateStatus(message) {
     console.log(message);
     document.getElementById("status").textContent = "Status: " + message;
 }
+
+window.onerror = function(message, source, lineno, colno, error) {
+    updateStatus("JavaScript error: " + message);
+    console.error("JavaScript error:", message, source, lineno, colno, error);
+};
 
 console.log("app.js loaded and parsed");
