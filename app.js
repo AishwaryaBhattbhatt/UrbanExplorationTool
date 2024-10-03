@@ -11,7 +11,7 @@ function initMap() {
     try {
         map = new google.maps.Map(document.getElementById("map"), {
             center: { lat: 0, lng: 0 },
-            zoom: 15,
+            zoom: 18,
             disableDefaultUI: true,
             zoomControl: true,
             styles: [
@@ -123,7 +123,6 @@ function requestGeolocation() {
                 var longitude = position.coords.longitude;
                 var latLng = new google.maps.LatLng(latitude, longitude);
                 map.setCenter(latLng);
-                map.setZoom(18);
                 placeUserMarker(latLng);
                 hexGrid.draw();
             },
@@ -164,17 +163,27 @@ function startExploring() {
         updateStatus("Started exploring. Moving will reveal hexagons.");
         watchId = navigator.geolocation.watchPosition(updateUserPosition, handleLocationError, {
             enableHighAccuracy: true,
-            maximumAge: 30000,
-            timeout: 27000
+            maximumAge: 0,
+            timeout: 5000
         });
+        document.getElementById('startExploring').textContent = 'Stop Exploring';
+    } else {
+        stopExploring();
     }
 }
 
-function refreshExploring() {
+function stopExploring() {
     exploring = false;
-    if (watchId) {
+    if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
+        watchId = null;
     }
+    updateStatus("Stopped exploring.");
+    document.getElementById('startExploring').textContent = 'Start Exploring';
+}
+
+function refreshExploring() {
+    stopExploring();
     revealedHexagons.clear();
     hexGrid.draw();
     updateStatus("Exploration refreshed. All hexagons hidden.");
@@ -188,6 +197,7 @@ function updateUserPosition(position) {
 }
 
 function revealHexagonAtPosition(latLng) {
+    if (!hexGrid.getProjection()) return;  // Exit if projection is not ready
     var pixel = hexGrid.getProjection().fromLatLngToContainerPixel(latLng);
     var hexagon = document.elementFromPoint(pixel.x, pixel.y);
     if (hexagon && hexagon.id && hexagon.id.startsWith("hex-")) {
@@ -199,6 +209,7 @@ function revealHexagonAtPosition(latLng) {
 
 function handleLocationError(error) {
     updateStatus("Error updating location: " + error.message);
+    stopExploring();
 }
 
 function updateStatus(message) {
