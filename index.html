@@ -13,9 +13,21 @@
         <div id="map"></div>
     </div>
     <div id="debug">
-        <p id="status">Status: Initializing...</p>
+        <p id="status">Status: Loading scripts...</p>
     </div>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap" async defer></script>
     <script src="app.js"></script>
+    <script>
+        function loadGoogleMapsAPI() {
+            var script = document.createElement('script');
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap';
+            script.async = true;
+            script.defer = true;
+            script.onerror = function() {
+                document.getElementById('status').textContent = 'Error: Failed to load Google Maps API. Check your API key.';
+            };
+            document.head.appendChild(script);
+        }
+        window.onload = loadGoogleMapsAPI;
+    </script>
 </body>
 </html>
