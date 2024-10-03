@@ -160,7 +160,11 @@ function placeUserMarker(latLng) {
 function startExploring() {
     if (!exploring) {
         exploring = true;
-        updateStatus("Started exploring. Moving will reveal hexagons.");
+        updateStatus("Started exploring. Current and new locations will reveal hexagons.");
+        // Reveal the hexagon at the current location
+        if (userMarker) {
+            revealHexagonAtPosition(userMarker.getPosition());
+        }
         watchId = navigator.geolocation.watchPosition(updateUserPosition, handleLocationError, {
             enableHighAccuracy: true,
             maximumAge: 0,
@@ -193,7 +197,9 @@ function updateUserPosition(position) {
     var latLng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
     placeUserMarker(latLng);
     map.panTo(latLng);
-    revealHexagonAtPosition(latLng);
+    if (exploring) {
+        revealHexagonAtPosition(latLng);
+    }
 }
 
 function revealHexagonAtPosition(latLng) {
