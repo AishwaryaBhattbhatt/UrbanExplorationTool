@@ -15,32 +15,46 @@ body, html {
 #map {
     height: 100%;
     width: 100%;
-    pointer-events: none;  /* Disable map interactions */
 }
 
 #hexSvg {
     position: absolute;
     top: 0;
     left: 0;
-    pointer-events: auto;  /* Enable interactions for the hexagon grid */
+    pointer-events: none;
 }
 
 .hexagon {
     fill: rgba(128, 128, 128, 0.9);
-    stroke: #4d4d4d;  /* Darker grey for the border */
+    stroke: #4d4d4d;
     stroke-width: 1px;
-    pointer-events: all;
-    cursor: pointer;
-    touch-action: none;
-}
-
-.hexagon:hover {
-    fill: rgba(100, 100, 100, 0.9);
 }
 
 .revealed {
     fill-opacity: 0;
-    pointer-events: none;
+}
+
+#controls {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+
+#controls button {
+    margin: 0 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+
+#controls button:hover {
+    background-color: #45a049;
 }
 
 #debug {
