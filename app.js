@@ -1,124 +1,64 @@
-let map;
-let hexSize = 30;
-let hexGrid;
-let revealedHexagons = new Set();
-
-function initMap() {
-    updateStatus("Initializing map...");
-    map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 0, lng: 0 },
-        zoom: 2,
-        disableDefaultUI: true,
-        gestureHandling: 'none',  // Disable pan and zoom gestures
-        zoomControl: false,  // Disable zoom control
-        styles: [
-            {
-                featureType: "poi",
-                stylers: [{ visibility: "off" }]
-            },
-            {
-                featureType: "transit",
-                stylers: [{ visibility: "off" }]
-            }
-        ]
-    });
-
-    hexGrid = new google.maps.OverlayView();
-    hexGrid.onAdd = function() {
-        const svg = d3.select(this.getPanes().overlayMouseTarget).append("svg")
-            .attr("id", "hexSvg")
-            .style("position", "absolute");
-        this.svg = svg;
-    };
-
-    hexGrid.draw = function() {
-        updateStatus("Drawing hex grid...");
-        this.svg.selectAll("*").remove();
-        const overlayProjection = this.getProjection();
-        const bounds = map.getBounds();
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
-        const topLeft = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(ne.lat(), sw.lng()));
-        const bottomRight = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(sw.lat(), ne.lng()));
-
-        const width = bottomRight.x - topLeft.x;
-        const height = bottomRight.y - topLeft.y;
-
-        this.svg.style("left", topLeft.x + "px")
-            .style("top", topLeft.y + "px")
-            .style("width", width + "px")
-            .style("height", height + "px");
-
-        const hexbin = d3.hexbin()
-            .radius(hexSize)
-            .extent([[0, 0], [width, height]]);
-
-        const points = d3.range(0, width, hexSize)
-            .flatMap(x => d3.range(0, height, hexSize * Math.sqrt(3) / 2)
-                .map(y => [x, y]));
-
-        const hexagons = this.svg.selectAll("path")
-            .data(hexbin(points))
-            .enter().append("path")
-            .attr("d", d => "M" + d.x + "," + d.y + hexbin.hexagon())
-            .attr("class", "hexagon")
-            .attr("id", (d, i) => `hex-${i}`)
-            .on("mousedown", handleHexagonInteraction)
-            .on("touchstart", handleHexagonInteraction);
-
-        // Re-apply revealed state to hexagons
-        revealedHexagons.forEach(id => {
-            this.svg.select(`#${id}`).classed("revealed", true);
-        });
-    };
-
-    hexGrid.setMap(map);
-
-    google.maps.event.addListener(map, 'bounds_changed', () => {
-        hexGrid.draw();
-    });
-
-    updateStatus("Map initialized. Requesting geolocation...");
-    requestGeolocation();
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
 }
 
-function requestGeolocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                updateStatus("Geolocation received. Centering map...");
-                const { latitude, longitude } = position.coords;
-                map.setCenter({ lat: latitude, lng: longitude });
-                map.setZoom(15);
-                hexGrid.draw();
-            },
-            (error) => {
-                updateStatus("Geolocation error: " + error.message);
-                hexGrid.draw();
-            }
-        );
-    } else {
-        updateStatus("Geolocation not supported by this browser.");
-        hexGrid.draw();
+#app {
+    position: relative;
+    height: 100%;
+    width: 100%;
+}
+
+#map {
+    height: 100%;
+    width: 100%;
+    pointer-events: none;
+}
+
+#hexSvg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: auto;
+}
+
+.hexagon {
+    fill: rgba(128, 128, 128, 0.9);
+    stroke: #4d4d4d;
+    stroke-width: 1px;
+    pointer-events: all;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.hexagon:hover {
+    fill: rgba(100, 100, 100, 0.9);
+}
+
+.revealed {
+    fill-opacity: 0;
+    pointer-events: none;
+}
+
+#debug {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 10px;
+    border-radius: 5px;
+    font-family: Arial, sans-serif;
+    z-index: 1000;
+    font-size: 14px;
+    max-width: 80%;
+}
+
+@media (max-width: 600px) {
+    #debug {
+        font-size: 12px;
+        padding: 5px;
     }
 }
-
-function handleHexagonInteraction(event, d) {
-    event.preventDefault();
-    event.stopPropagation();
-    const hexId = d3.select(this).attr("id");
-    d3.select(this).classed("revealed", true);
-    revealedHexagons.add(hexId);
-    updateStatus("Hexagon revealed!");
-}
-
-function updateStatus(message) {
-    console.log(message);
-    document.getElementById("status").textContent = "Status: " + message;
-}
-
-// Adjust hexSize based on zoom level
-google.maps.event.addListener(map, 'zoom_changed', function() {
-    hexSize = Math.max(15, Math.min(30, 30 * Math.pow(2, map.getZoom() - 15)));
-    hexGrid.draw();
-});
