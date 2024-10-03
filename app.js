@@ -10,7 +10,11 @@ var baseZoom = 18;
 function initMap() {
     updateStatus("Initializing map...");
     try {
-        map = new google.maps.Map(document.getElementById("map"), {
+        var mapDiv = document.getElementById("map");
+        if (!mapDiv) {
+            throw new Error("Map container not found");
+        }
+        map = new google.maps.Map(mapDiv, {
             center: { lat: 0, lng: 0 },
             zoom: baseZoom,
             disableDefaultUI: true,
@@ -247,7 +251,12 @@ function handleLocationError(error) {
 
 function updateStatus(message) {
     console.log(message);
-    document.getElementById("status").textContent = "Status: " + message;
+    var statusElement = document.getElementById("status");
+    if (statusElement) {
+        statusElement.textContent = "Status: " + message;
+    } else {
+        console.warn("Status element not found in the DOM");
+    }
 }
 
 window.onerror = function(message, source, lineno, colno, error) {
@@ -255,4 +264,4 @@ window.onerror = function(message, source, lineno, colno, error) {
     console.error("JavaScript error:", message, source, lineno, colno, error);
 };
 
-console.log("app.js loaded and parsed");
+window.initMap = initMap;
