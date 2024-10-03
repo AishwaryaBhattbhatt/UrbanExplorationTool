@@ -15,13 +15,14 @@ body, html {
 #map {
     height: 100%;
     width: 100%;
+    pointer-events: none;  /* Disable map interactions */
 }
 
 #hexSvg {
     position: absolute;
     top: 0;
     left: 0;
-    pointer-events: none;
+    pointer-events: auto;  /* Enable interactions for the hexagon grid */
 }
 
 .hexagon {

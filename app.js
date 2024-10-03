@@ -1,6 +1,7 @@
 let map;
 let hexSize = 30;
 let hexGrid;
+let revealedHexagons = new Set();
 
 function initMap() {
     updateStatus("Initializing map...");
@@ -8,6 +9,8 @@ function initMap() {
         center: { lat: 0, lng: 0 },
         zoom: 2,
         disableDefaultUI: true,
+        gestureHandling: 'none',  // Disable pan and zoom gestures
+        zoomControl: false,  // Disable zoom control
         styles: [
             {
                 featureType: "poi",
@@ -59,8 +62,14 @@ function initMap() {
             .enter().append("path")
             .attr("d", d => "M" + d.x + "," + d.y + hexbin.hexagon())
             .attr("class", "hexagon")
+            .attr("id", (d, i) => `hex-${i}`)
             .on("mousedown", handleHexagonInteraction)
             .on("touchstart", handleHexagonInteraction);
+
+        // Re-apply revealed state to hexagons
+        revealedHexagons.forEach(id => {
+            this.svg.select(`#${id}`).classed("revealed", true);
+        });
     };
 
     hexGrid.setMap(map);
@@ -94,10 +103,12 @@ function requestGeolocation() {
     }
 }
 
-function handleHexagonInteraction(event) {
+function handleHexagonInteraction(event, d) {
     event.preventDefault();
     event.stopPropagation();
+    const hexId = d3.select(this).attr("id");
     d3.select(this).classed("revealed", true);
+    revealedHexagons.add(hexId);
     updateStatus("Hexagon revealed!");
 }
 
