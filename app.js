@@ -22,7 +22,7 @@ function initMap() {
 
     hexGrid = new google.maps.OverlayView();
     hexGrid.onAdd = function() {
-        const svg = d3.select(this.getPanes().overlayLayer).append("svg")
+        const svg = d3.select(this.getPanes().overlayMouseTarget).append("svg")
             .attr("id", "hexSvg")
             .style("position", "absolute");
         this.svg = svg;
@@ -94,8 +94,8 @@ function requestGeolocation() {
     }
 }
 
-function revealHexagon(event) {
-    event.preventDefault();
+function revealHexagon(event, d) {
+    event.stopPropagation();
     d3.select(this).classed("revealed", true);
     updateStatus("Hexagon revealed!");
 }
