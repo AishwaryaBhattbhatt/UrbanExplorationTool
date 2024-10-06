@@ -2,6 +2,8 @@ var map;
 var HEXAGON_DIAMETER_METERS = 100;
 var hexGrid;
 var revealedHexagons = new Set();
+var lastKnownPosition = null;
+var POSITION_CHANGE_THRESHOLD = 0.001; // Threshold for significant change in geolocation
 
 function initMap() {
     updateStatus("Initializing map...");
@@ -78,10 +80,9 @@ function initMap() {
                 .enter().append("path")
                 .attr("d", function(d) { return "M" + d.x + "," + d.y + hexbin.hexagon(); })
                 .attr("class", "hexagon")
-                .attr("id", function(d, i) { return "hex-" + i; })
-                .on("mousedown", handleHexagonInteraction)
-                .on("touchstart", handleHexagonInteraction);
+                .attr("id", function(d, i) { return "hex-" + i; });
 
+            // Reveal hexagons that are already revealed
             revealedHexagons.forEach(function(id) {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
@@ -100,9 +101,13 @@ function initMap() {
             requestGeolocation();
         });
 
+        let debounceTimer;
         google.maps.event.addListener(map, 'bounds_changed', function() {
-            updateStatus("Bounds changed. Redrawing hex grid...");
-            hexGrid.draw();
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function() {
+                updateStatus("Bounds changed. Redrawing hex grid...");
+                hexGrid.draw();
+            }, 200); // Adjust debounce time as needed
         });
 
     } catch (error) {
@@ -115,11 +120,24 @@ function requestGeolocation() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                updateStatus("Geolocation received. Centering map...");
                 var latitude = position.coords.latitude;
                 var longitude = position.coords.longitude;
+
+                if (lastKnownPosition) {
+                    var latDiff = Math.abs(lastKnownPosition.latitude - latitude);
+                    var lngDiff = Math.abs(lastKnownPosition.longitude - longitude);
+                    if (latDiff < POSITION_CHANGE_THRESHOLD && lngDiff < POSITION_CHANGE_THRESHOLD) {
+                        updateStatus("Geolocation has not changed significantly. Skipping update.");
+                        return;
+                    }
+                }
+
+                lastKnownPosition = { latitude: latitude, longitude: longitude };
+
+                updateStatus("Geolocation received. Centering map...");
                 map.setCenter({ lat: latitude, lng: longitude });
                 map.setZoom(15);
+                revealHexagonsAroundPosition(latitude, longitude);
                 hexGrid.draw();
             },
             function(error) {
@@ -133,13 +151,23 @@ function requestGeolocation() {
     }
 }
 
-function handleHexagonInteraction(event, d) {
-    event.preventDefault();
-    event.stopPropagation();
-    var hexId = d3.select(this).attr("id");
-    d3.select(this).classed("revealed", true);
-    revealedHexagons.add(hexId);
-    updateStatus("Hexagon revealed: " + hexId);
+function revealHexagonsAroundPosition(lat, lng) {
+    var overlayProjection = hexGrid.getProjection();
+    var userPosition = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+    var revealRadius = 150; // Adjust radius as needed
+
+    hexGrid.svg.selectAll(".hexagon").each(function(d) {
+        var hexX = d.x;
+        var hexY = d.y;
+        var distanceSquared = Math.pow(hexX - userPosition.x, 2) + Math.pow(hexY - userPosition.y, 2);
+        if (distanceSquared <= Math.pow(revealRadius, 2)) {
+            var hexId = d3.select(this).attr("id");
+            d3.select(this).classed("revealed", true);
+            revealedHexagons.add(hexId);
+        }
+    });
+
+    updateStatus("Hexagons revealed around user's position.");
 }
 
 function updateStatus(message) {
