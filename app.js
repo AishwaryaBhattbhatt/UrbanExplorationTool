@@ -5,6 +5,7 @@ var revealedHexagons = new Set();
 var lastKnownPosition = null;
 var POSITION_CHANGE_THRESHOLD = 0.001; // Threshold for significant change in geolocation
 var startExploringButton;
+var userLocationMarker = null; // Marker for showing user location
 
 function initMap() {
     updateStatus("Initializing map...");
@@ -189,20 +190,24 @@ function requestGeolocation() {
                 revealHexagonsAroundPosition(latitude, longitude);
                 hexGrid.draw();
 
-                // Show current user location marker
-                new google.maps.Marker({
-                    position: { lat: latitude, lng: longitude },
-                    map: map,
-                    title: "You are here",
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 7,
-                        fillColor: "#007bff",
-                        fillOpacity: 1,
-                        strokeColor: "white",
-                        strokeWeight: 2
-                    }
-                });
+                // Show or update current user location marker
+                if (!userLocationMarker) {
+                    userLocationMarker = new google.maps.Marker({
+                        position: { lat: latitude, lng: longitude },
+                        map: map,
+                        title: "You are here",
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 7,
+                            fillColor: "#007bff",
+                            fillOpacity: 1,
+                            strokeColor: "white",
+                            strokeWeight: 2
+                        }
+                    });
+                } else {
+                    userLocationMarker.setPosition({ lat: latitude, lng: longitude });
+                }
             },
             function(error) {
                 updateStatus("Geolocation error: " + error.message);
