@@ -1,7 +1,7 @@
 var map;
-var SQUARE_SIZE_METERS = 100; // 100 meters for the square side
-var squareGrid;
-var revealedSquares = new Set();
+var HEXAGON_DIAMETER_METERS = 100; // 100 meters for the diameter
+var hexGrid;
+var revealedHexagons = new Set();
 var userMarker;
 var watchId;
 var exploring = false;
@@ -31,72 +31,69 @@ function initMap() {
             ]
         });
 
-        updateStatus("Map object created. Setting up square grid...");
+        updateStatus("Map object created. Setting up hex grid...");
 
-        squareGrid = new google.maps.OverlayView();
-        squareGrid.onAdd = function() {
-            updateStatus("Square grid onAdd called.");
+        hexGrid = new google.maps.OverlayView();
+        hexGrid.onAdd = function() {
+            updateStatus("Hex grid onAdd called.");
             var svg = d3.select(this.getPanes().overlayMouseTarget).append("svg")
-                .attr("id", "squareSvg")
-                .style("position", "absolute")
-                .attr("preserveAspectRatio", "xMidYMid meet");
+                .attr("id", "hexSvg")
+                .style("position", "absolute");
             this.svg = svg;
         };
 
-        squareGrid.draw = function() {
-            updateStatus("Drawing square grid...");
+        hexGrid.draw = function() {
+            updateStatus("Drawing hex grid...");
             if (!this.svg) {
                 updateStatus("Error: SVG not initialized");
                 return;
             }
 
-            this.svg.selectAll("*").remove(); // Clear the existing grid
+            // Clear old hexagons (only on first draw)
+            this.svg.selectAll("*").remove();
 
             var overlayProjection = this.getProjection();
             var bounds = map.getBounds();
             var ne = bounds.getNorthEast();
             var sw = bounds.getSouthWest();
 
-            var center = map.getCenter();
-            var pixelsPerMeter = this.getPixelsPerMeter(center.lat());
+            var pixelsPerMeter = this.getPixelsPerMeter(map.getCenter().lat());
+            var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter;
 
-            // Define the size of each square in terms of meters
-            var squareSize = SQUARE_SIZE_METERS * pixelsPerMeter;
+            var hexbin = d3.hexbin()
+                .radius(hexRadius);
 
-            // Loop through the area within map bounds and place squares
             var points = [];
-            for (var x = sw.lng(); x <= ne.lng(); x += SQUARE_SIZE_METERS / 1000) {
-                for (var y = sw.lat(); y <= ne.lat(); y += SQUARE_SIZE_METERS / 1000) {
-                    points.push([x, y]);
+            // Loop to generate points in lat/lng space within the map bounds
+            for (var lng = sw.lng(); lng <= ne.lng(); lng += (HEXAGON_DIAMETER_METERS / 1000) * 1.5) {
+                for (var lat = sw.lat(); lat <= ne.lat(); lat += (HEXAGON_DIAMETER_METERS / 1000) * Math.sqrt(3)) {
+                    points.push([lng, lat]);
                 }
             }
 
-            var squares = this.svg.selectAll("rect")
-                .data(points)
-                .enter().append("rect")
-                .attr("x", function(d) {
-                    return overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d[1], d[0])).x;
+            var hexagons = this.svg.selectAll("path")
+                .data(hexbin(points))
+                .enter().append("path")
+                .attr("d", function(d) { 
+                    var point = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d[1], d[0]));
+                    return "M" + point.x + "," + point.y + hexbin.hexagon(); 
                 })
-                .attr("y", function(d) {
-                    return overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d[1], d[0])).y;
-                })
-                .attr("width", squareSize)
-                .attr("height", squareSize)
-                .attr("class", "square")
-                .attr("id", function(d, i) { return "square-" + i; });
+                .attr("class", "hexagon")
+                .attr("id", function(d, i) { return "hex-" + i; });
 
-            revealedSquares.forEach(function(id) {
+            // Reapply revealed class to previously visited hexagons
+            revealedHexagons.forEach(function(id) {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
 
-            updateStatus("Square grid drawn. Total squares: " + squares.size());
+            updateStatus("Hex grid drawn. Total hexagons: " + hexagons.size());
         };
 
-        squareGrid.getPixelsPerMeter = function(latitude) {
+        hexGrid.getPixelsPerMeter = function(latitude) {
             return this.getProjection().getWorldWidth() / (40075016.686 * Math.cos(latitude * Math.PI / 180));
         };
 
-        squareGrid.setMap(map);
+        hexGrid.setMap(map);
 
         google.maps.event.addListenerOnce(map, 'idle', function() {
             updateStatus("Map idle. Requesting geolocation...");
@@ -104,8 +101,8 @@ function initMap() {
         });
 
         google.maps.event.addListener(map, 'bounds_changed', function() {
-            updateStatus("Bounds changed. Redrawing square grid...");
-            squareGrid.draw();
+            updateStatus("Bounds changed. Redrawing hex grid...");
+            hexGrid.draw();
         });
 
         var startExploringBtn = document.getElementById('startExploring');
@@ -140,11 +137,11 @@ function requestGeolocation() {
                 var latLng = new google.maps.LatLng(latitude, longitude);
                 map.setCenter(latLng);
                 placeUserMarker(latLng);
-                squareGrid.draw();
+                hexGrid.draw();
             },
             function(error) {
                 updateStatus("Geolocation error: " + error.message);
-                squareGrid.draw();
+                hexGrid.draw();
             },
             {
                 enableHighAccuracy: true,
@@ -154,7 +151,7 @@ function requestGeolocation() {
         );
     } else {
         updateStatus("Geolocation not supported by this browser.");
-        squareGrid.draw();
+        hexGrid.draw();
     }
 }
 
@@ -182,11 +179,11 @@ function placeUserMarker(latLng) {
 function startExploring() {
     if (!exploring) {
         exploring = true;
-        updateStatus("Started exploring. Current and new locations will reveal squares.");
+        updateStatus("Started exploring. Current and new locations will reveal hexagons.");
         if (userMarker) {
-            revealSquareAtPosition(userMarker.getPosition());
+            revealHexagonAtPosition(userMarker.getPosition());
         } else {
-            updateStatus("Warning: User marker not set. Unable to reveal initial square.");
+            updateStatus("Warning: User marker not set. Unable to reveal initial hexagon.");
         }
         watchId = navigator.geolocation.watchPosition(updateUserPosition, handleLocationError, {
             enableHighAccuracy: true,
@@ -211,9 +208,9 @@ function stopExploring() {
 
 function refreshExploring() {
     stopExploring();
-    revealedSquares.clear();
-    squareGrid.draw();
-    updateStatus("Exploration refreshed. All squares hidden.");
+    revealedHexagons.clear();
+    hexGrid.draw();
+    updateStatus("Exploration refreshed. All hexagons hidden.");
 }
 
 function updateUserPosition(position) {
@@ -221,24 +218,24 @@ function updateUserPosition(position) {
     placeUserMarker(latLng);
     map.panTo(latLng);
     if (exploring) {
-        revealSquareAtPosition(latLng);
+        revealHexagonAtPosition(latLng);
     }
     updateStatus("User position updated: " + latLng.lat() + ", " + latLng.lng());
 }
 
-function revealSquareAtPosition(latLng) {
-    if (!squareGrid.getProjection()) {
-        updateStatus("Error: Square grid projection not ready");
+function revealHexagonAtPosition(latLng) {
+    if (!hexGrid.getProjection()) {
+        updateStatus("Error: Hex grid projection not ready");
         return;
     }
-    var pixel = squareGrid.getProjection().fromLatLngToContainerPixel(latLng);
-    var square = document.elementFromPoint(pixel.x, pixel.y);
-    if (square && square.id && square.id.startsWith("square-")) {
-        square.classList.add("revealed");
-        revealedSquares.add(square.id);
-        updateStatus("Revealed square: " + square.id);
+    var pixel = hexGrid.getProjection().fromLatLngToContainerPixel(latLng);
+    var hexagon = document.elementFromPoint(pixel.x, pixel.y);
+    if (hexagon && hexagon.id && hexagon.id.startsWith("hex-")) {
+        hexagon.classList.add("revealed");
+        revealedHexagons.add(hexagon.id);
+        updateStatus("Revealed hexagon: " + hexagon.id);
     } else {
-        updateStatus("No square found at position: " + latLng.lat() + ", " + latLng.lng());
+        updateStatus("No hexagon found at position: " + latLng.lat() + ", " + latLng.lng());
     }
 }
 
@@ -249,4 +246,17 @@ function handleLocationError(error) {
 
 function updateStatus(message) {
     console.log(message);
-    var statusElement = document
+    var statusElement = document.getElementById("status");
+    if (statusElement) {
+        statusElement.textContent = "Status: " + message;
+    } else {
+        console.warn("Status element not found in the DOM");
+    }
+}
+
+window.onerror = function(message, source, lineno, colno, error) {
+    updateStatus("JavaScript error: " + message);
+    console.error("JavaScript error:", message, source, lineno, colno, error);
+};
+
+window.initMap = initMap;
