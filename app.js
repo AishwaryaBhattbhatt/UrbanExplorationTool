@@ -1,7 +1,7 @@
 var map;
-var HEXAGON_DIAMETER_METERS = 100; // 100 meters for the diameter
-var hexGrid;
-var revealedHexagons = new Set();
+var SQUARE_SIZE_METERS = 100; // 100 meters for the square side
+var squareGrid;
+var revealedSquares = new Set();
 var userMarker;
 var watchId;
 var exploring = false;
@@ -31,29 +31,26 @@ function initMap() {
             ]
         });
 
-        updateStatus("Map object created. Setting up hex grid...");
+        updateStatus("Map object created. Setting up square grid...");
 
-        hexGrid = new google.maps.OverlayView();
-        hexGrid.onAdd = function() {
-            updateStatus("Hex grid onAdd called.");
+        squareGrid = new google.maps.OverlayView();
+        squareGrid.onAdd = function() {
+            updateStatus("Square grid onAdd called.");
             var svg = d3.select(this.getPanes().overlayMouseTarget).append("svg")
-                .attr("id", "hexSvg")
-                .style("position", "absolute");
+                .attr("id", "squareSvg")
+                .style("position", "absolute")
+                .attr("preserveAspectRatio", "xMidYMid meet");
             this.svg = svg;
         };
 
-        hexGrid.draw = function() {
-            updateStatus("Drawing hex grid...");
+        squareGrid.draw = function() {
+            updateStatus("Drawing square grid...");
             if (!this.svg) {
                 updateStatus("Error: SVG not initialized");
                 return;
             }
-            
-            // Do not redraw the hexagons, lock them in place.
-            if (this.svg.selectAll("path").size() > 0) {
-                updateStatus("Grid already drawn, skipping redraw.");
-                return;
-            }
+
+            this.svg.selectAll("*").remove(); // Clear the existing grid
 
             var overlayProjection = this.getProjection();
             var bounds = map.getBounds();
@@ -63,49 +60,43 @@ function initMap() {
             var center = map.getCenter();
             var pixelsPerMeter = this.getPixelsPerMeter(center.lat());
 
-            // Lock hexRadius to be based on 100 meters and fixed, not scaling with zoom
-            var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter;
+            // Define the size of each square in terms of meters
+            var squareSize = SQUARE_SIZE_METERS * pixelsPerMeter;
 
-            var hexbin = d3.hexbin()
-                .radius(hexRadius)
-                .extent([[sw.lng(), sw.lat()], [ne.lng(), ne.lat()]]); // use lat/lng for extent
-
-            // Create a hexagonal grid based on map's bounds (lat/lng)
+            // Loop through the area within map bounds and place squares
             var points = [];
-            for (var x = sw.lng(); x <= ne.lng(); x += (HEXAGON_DIAMETER_METERS / 1000) * 1.5) {
-                for (var y = sw.lat(); y <= ne.lat(); y += (HEXAGON_DIAMETER_METERS / 1000) * Math.sqrt(3)) {
+            for (var x = sw.lng(); x <= ne.lng(); x += SQUARE_SIZE_METERS / 1000) {
+                for (var y = sw.lat(); y <= ne.lat(); y += SQUARE_SIZE_METERS / 1000) {
                     points.push([x, y]);
                 }
             }
 
-            var hexagons = this.svg.selectAll("path")
-                .data(hexbin(points))
-                .enter().append("path")
-                .attr("d", function(d) { 
-                    var point = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d[1], d[0]));
-                    return "M" + point.x + "," + point.y + hexbin.hexagon(); 
+            var squares = this.svg.selectAll("rect")
+                .data(points)
+                .enter().append("rect")
+                .attr("x", function(d) {
+                    return overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d[1], d[0])).x;
                 })
-                .attr("class", "hexagon")
-                .attr("id", function(d, i) { return "hex-" + i; });
+                .attr("y", function(d) {
+                    return overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d[1], d[0])).y;
+                })
+                .attr("width", squareSize)
+                .attr("height", squareSize)
+                .attr("class", "square")
+                .attr("id", function(d, i) { return "square-" + i; });
 
-            // Apply transformation to hexagons on zoom
-            map.addListener("zoom_changed", function() {
-                var zoomScale = Math.pow(2, map.getZoom() - baseZoom);
-                d3.selectAll(".hexagon").attr("transform", "scale(" + zoomScale + ")");
-            });
-
-            revealedHexagons.forEach(function(id) {
+            revealedSquares.forEach(function(id) {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
 
-            updateStatus("Hex grid drawn. Total hexagons: " + hexagons.size());
+            updateStatus("Square grid drawn. Total squares: " + squares.size());
         };
 
-        hexGrid.getPixelsPerMeter = function(latitude) {
+        squareGrid.getPixelsPerMeter = function(latitude) {
             return this.getProjection().getWorldWidth() / (40075016.686 * Math.cos(latitude * Math.PI / 180));
         };
 
-        hexGrid.setMap(map);
+        squareGrid.setMap(map);
 
         google.maps.event.addListenerOnce(map, 'idle', function() {
             updateStatus("Map idle. Requesting geolocation...");
@@ -113,7 +104,8 @@ function initMap() {
         });
 
         google.maps.event.addListener(map, 'bounds_changed', function() {
-            updateStatus("Bounds changed. Keeping hex grid in place.");
+            updateStatus("Bounds changed. Redrawing square grid...");
+            squareGrid.draw();
         });
 
         var startExploringBtn = document.getElementById('startExploring');
@@ -148,11 +140,11 @@ function requestGeolocation() {
                 var latLng = new google.maps.LatLng(latitude, longitude);
                 map.setCenter(latLng);
                 placeUserMarker(latLng);
-                hexGrid.draw();
+                squareGrid.draw();
             },
             function(error) {
                 updateStatus("Geolocation error: " + error.message);
-                hexGrid.draw();
+                squareGrid.draw();
             },
             {
                 enableHighAccuracy: true,
@@ -162,7 +154,7 @@ function requestGeolocation() {
         );
     } else {
         updateStatus("Geolocation not supported by this browser.");
-        hexGrid.draw();
+        squareGrid.draw();
     }
 }
 
@@ -190,11 +182,11 @@ function placeUserMarker(latLng) {
 function startExploring() {
     if (!exploring) {
         exploring = true;
-        updateStatus("Started exploring. Current and new locations will reveal hexagons.");
+        updateStatus("Started exploring. Current and new locations will reveal squares.");
         if (userMarker) {
-            revealHexagonAtPosition(userMarker.getPosition());
+            revealSquareAtPosition(userMarker.getPosition());
         } else {
-            updateStatus("Warning: User marker not set. Unable to reveal initial hexagon.");
+            updateStatus("Warning: User marker not set. Unable to reveal initial square.");
         }
         watchId = navigator.geolocation.watchPosition(updateUserPosition, handleLocationError, {
             enableHighAccuracy: true,
@@ -219,9 +211,9 @@ function stopExploring() {
 
 function refreshExploring() {
     stopExploring();
-    revealedHexagons.clear();
-    hexGrid.draw();
-    updateStatus("Exploration refreshed. All hexagons hidden.");
+    revealedSquares.clear();
+    squareGrid.draw();
+    updateStatus("Exploration refreshed. All squares hidden.");
 }
 
 function updateUserPosition(position) {
@@ -229,24 +221,24 @@ function updateUserPosition(position) {
     placeUserMarker(latLng);
     map.panTo(latLng);
     if (exploring) {
-        revealHexagonAtPosition(latLng);
+        revealSquareAtPosition(latLng);
     }
     updateStatus("User position updated: " + latLng.lat() + ", " + latLng.lng());
 }
 
-function revealHexagonAtPosition(latLng) {
-    if (!hexGrid.getProjection()) {
-        updateStatus("Error: Hex grid projection not ready");
+function revealSquareAtPosition(latLng) {
+    if (!squareGrid.getProjection()) {
+        updateStatus("Error: Square grid projection not ready");
         return;
     }
-    var pixel = hexGrid.getProjection().fromLatLngToContainerPixel(latLng);
-    var hexagon = document.elementFromPoint(pixel.x, pixel.y);
-    if (hexagon && hexagon.id && hexagon.id.startsWith("hex-")) {
-        hexagon.classList.add("revealed");
-        revealedHexagons.add(hexagon.id);
-        updateStatus("Revealed hexagon: " + hexagon.id);
+    var pixel = squareGrid.getProjection().fromLatLngToContainerPixel(latLng);
+    var square = document.elementFromPoint(pixel.x, pixel.y);
+    if (square && square.id && square.id.startsWith("square-")) {
+        square.classList.add("revealed");
+        revealedSquares.add(square.id);
+        updateStatus("Revealed square: " + square.id);
     } else {
-        updateStatus("No hexagon found at position: " + latLng.lat() + ", " + latLng.lng());
+        updateStatus("No square found at position: " + latLng.lat() + ", " + latLng.lng());
     }
 }
 
@@ -257,17 +249,4 @@ function handleLocationError(error) {
 
 function updateStatus(message) {
     console.log(message);
-    var statusElement = document.getElementById("status");
-    if (statusElement) {
-        statusElement.textContent = "Status: " + message;
-    } else {
-        console.warn("Status element not found in the DOM");
-    }
-}
-
-window.onerror = function(message, source, lineno, colno, error) {
-    updateStatus("JavaScript error: " + message);
-    console.error("JavaScript error:", message, source, lineno, colno, error);
-};
-
-window.initMap = initMap;
+    var statusElement = document
