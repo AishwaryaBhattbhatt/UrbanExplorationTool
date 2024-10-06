@@ -49,7 +49,8 @@ function setupHexGrid() {
 
         hexGrid.onAdd = function() {
             updateStatus("Hex grid onAdd called.");
-            var svg = d3.select(this.getPanes().overlayMouseTarget).append("svg")
+            var layer = this.getPanes().overlayLayer;
+            var svg = d3.select(layer).append("svg")
                 .attr("id", "hexSvg")
                 .style("position", "absolute");
             this.svg = svg;
@@ -62,12 +63,25 @@ function setupHexGrid() {
                     updateStatus("Error: SVG not initialized");
                     return;
                 }
-                this.svg.selectAll("*").remove(); // Clearing previous elements
+
+                // Clear the SVG contents to prevent duplicates
+                this.svg.selectAll("*").remove();
 
                 var overlayProjection = this.getProjection();
                 var bounds = map.getBounds();
                 var ne = bounds.getNorthEast();
                 var sw = bounds.getSouthWest();
+
+                var topLeft = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(ne.lat(), sw.lng()));
+                var bottomRight = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(sw.lat(), ne.lng()));
+
+                var width = bottomRight.x - topLeft.x;
+                var height = bottomRight.y - topLeft.y;
+
+                this.svg.style("left", topLeft.x + "px")
+                    .style("top", topLeft.y + "px")
+                    .style("width", width + "px")
+                    .style("height", height + "px");
 
                 var center = map.getCenter();
                 var pixelsPerMeter = this.getPixelsPerMeter(center.lat());
@@ -90,8 +104,12 @@ function setupHexGrid() {
                         return "M" + point.x + "," + point.y + hexbin.hexagon();
                     })
                     .attr("class", "hexagon")
-                    .attr("id", function(d, i) { return "hex-" + i; });
+                    .attr("id", function(d, i) { return "hex-" + i; })
+                    .style("fill", "rgba(128, 128, 128, 0.9)")
+                    .style("stroke", "#4d4d4d")
+                    .style("stroke-width", "1px");
 
+                // Reapply revealed class to previously visited hexagons
                 revealedHexagons.forEach(function(id) {
                     this.svg.select("#" + id).classed("revealed", true);
                 }.bind(this));
