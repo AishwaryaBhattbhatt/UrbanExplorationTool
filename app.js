@@ -48,54 +48,66 @@ function initMap() {
                 updateStatus("Error: SVG not initialized");
                 return;
             }
-            this.svg.selectAll("*").remove();
+        
+            // Do not remove the SVG contents; we keep the grid static
+            if (this.svg.selectAll("path").size() > 0) {
+                updateStatus("Grid already drawn, skipping redraw.");
+                return;
+            }
+        
             var overlayProjection = this.getProjection();
             var bounds = map.getBounds();
             var ne = bounds.getNorthEast();
             var sw = bounds.getSouthWest();
-            var topLeft = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(ne.lat(), sw.lng()));
-            var bottomRight = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(sw.lat(), ne.lng()));
-
-            var width = bottomRight.x - topLeft.x;
-            var height = bottomRight.y - topLeft.y;
-
-            this.svg.style("left", topLeft.x + "px")
-                .style("top", topLeft.y + "px")
-                .style("width", width + "px")
-                .style("height", height + "px");
-
+        
             var center = map.getCenter();
             var pixelsPerMeter = this.getPixelsPerMeter(center.lat());
-
-            // Lock the hex radius based on a fixed 100 meters
+        
+            // Lock hexRadius to be based on 100 meters and fixed, not scaling with zoom
             var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter;
-
+        
             var hexbin = d3.hexbin()
                 .radius(hexRadius)
-                .extent([[0, 0], [width, height]]);
-
+                .extent([[sw.lng(), sw.lat()], [ne.lng(), ne.lat()]]); // use lat/lng for extent
+        
+            // Create a hexagonal grid based on map's bounds (lat/lng)
             var points = [];
-            for (var x = 0; x < width; x += hexRadius * Math.sqrt(3)) {
-                for (var y = 0; y < height; y += hexRadius * 3) {
+            for (var x = sw.lng(); x <= ne.lng(); x += (HEXAGON_DIAMETER_METERS / 1000) * 1.5) {
+                for (var y = sw.lat(); y <= ne.lat(); y += (HEXAGON_DIAMETER_METERS / 1000) * Math.sqrt(3)) {
                     points.push([x, y]);
-                    points.push([x + hexRadius * Math.sqrt(3) / 2, y + hexRadius * 1.5]);
                 }
             }
-
+        
             var hexagons = this.svg.selectAll("path")
                 .data(hexbin(points))
                 .enter().append("path")
-                .attr("d", function(d) { return "M" + d.x + "," + d.y + hexbin.hexagon(); })
+                .attr("d", function(d) { return "M" + overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d.y, d.x)).x + "," + overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d.y, d.x)).y + hexbin.hexagon(); })
                 .attr("class", "hexagon")
                 .attr("id", function(d, i) { return "hex-" + i; });
-
+        
             // Reapply revealed class to previously visited hexagons
             revealedHexagons.forEach(function(id) {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
-
+        
             updateStatus("Hex grid drawn. Total hexagons: " + hexagons.size());
         };
+        
+        hexGrid.getPixelsPerMeter = function(latitude) {
+            return this.getProjection().getWorldWidth() / (40075016.686 * Math.cos(latitude * Math.PI / 180));
+        };
+        
+        // Event listeners
+        google.maps.event.addListener(map, 'zoom_changed', function() {
+            updateStatus("Zoom changed. Keeping grid static.");
+            hexGrid.draw(); // This ensures that the hexagons stay in place during zoom
+        });
+        
+        google.maps.event.addListener(map, 'dragend', function() {
+            updateStatus("Drag ended. Keeping grid static.");
+            hexGrid.draw(); // Ensures hexagons remain static on drag
+        });
+        
 
         hexGrid.getPixelsPerMeter = function(latitude) {
             return this.getProjection().getWorldWidth() / (40075016.686 * Math.cos(latitude * Math.PI / 180));
