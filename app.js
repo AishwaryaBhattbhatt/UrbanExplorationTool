@@ -1,5 +1,5 @@
 var map;
-var HEXAGON_DIAMETER_METERS = 100;
+var HEXAGON_DIAMETER_METERS = 100; // 100 meters for the diameter
 var hexGrid;
 var revealedHexagons = new Set();
 var userMarker;
@@ -18,9 +18,7 @@ function initMap() {
             center: { lat: 0, lng: 0 },
             zoom: baseZoom,
             disableDefaultUI: true,
-            zoomControl: false,  // Disable zoom control
-            minZoom: baseZoom,   // Set minimum zoom to baseZoom
-            maxZoom: baseZoom,   // Set maximum zoom to baseZoom
+            zoomControl: true,
             styles: [
                 {
                     featureType: "poi",
@@ -32,14 +30,6 @@ function initMap() {
                 }
             ]
         });
-
-        // Prevent zoom on double click
-        map.addListener('dblclick', function(e) {
-            e.stop();
-        });
-
-        // Disable scroll wheel zooming
-        map.setOptions({scrollwheel: false});
 
         updateStatus("Map object created. Setting up hex grid...");
 
@@ -58,45 +48,40 @@ function initMap() {
                 updateStatus("Error: SVG not initialized");
                 return;
             }
+
+            // Clear old hexagons (only on first draw)
             this.svg.selectAll("*").remove();
+
             var overlayProjection = this.getProjection();
             var bounds = map.getBounds();
             var ne = bounds.getNorthEast();
             var sw = bounds.getSouthWest();
-            var topLeft = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(ne.lat(), sw.lng()));
-            var bottomRight = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(sw.lat(), ne.lng()));
 
-            var width = bottomRight.x - topLeft.x;
-            var height = bottomRight.y - topLeft.y;
-
-            this.svg.style("left", topLeft.x + "px")
-                .style("top", topLeft.y + "px")
-                .style("width", width + "px")
-                .style("height", height + "px");
-
-            var center = map.getCenter();
-            var pixelsPerMeter = this.getPixelsPerMeter(center.lat());
+            var pixelsPerMeter = this.getPixelsPerMeter(map.getCenter().lat());
             var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter;
 
             var hexbin = d3.hexbin()
-                .radius(hexRadius)
-                .extent([[0, 0], [width, height]]);
+                .radius(hexRadius);
 
             var points = [];
-            for (var x = 0; x < width; x += hexRadius * Math.sqrt(3)) {
-                for (var y = 0; y < height; y += hexRadius * 3) {
-                    points.push([x, y]);
-                    points.push([x + hexRadius * Math.sqrt(3) / 2, y + hexRadius * 1.5]);
+            // Loop to generate points in lat/lng space within the map bounds
+            for (var lng = sw.lng(); lng <= ne.lng(); lng += (HEXAGON_DIAMETER_METERS / 1000) * 1.5) {
+                for (var lat = sw.lat(); lat <= ne.lat(); lat += (HEXAGON_DIAMETER_METERS / 1000) * Math.sqrt(3)) {
+                    points.push([lng, lat]);
                 }
             }
 
             var hexagons = this.svg.selectAll("path")
                 .data(hexbin(points))
                 .enter().append("path")
-                .attr("d", function(d) { return "M" + d.x + "," + d.y + hexbin.hexagon(); })
+                .attr("d", function(d) { 
+                    var point = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d[1], d[0]));
+                    return "M" + point.x + "," + point.y + hexbin.hexagon(); 
+                })
                 .attr("class", "hexagon")
                 .attr("id", function(d, i) { return "hex-" + i; });
 
+            // Reapply revealed class to previously visited hexagons
             revealedHexagons.forEach(function(id) {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
@@ -192,19 +177,27 @@ function placeUserMarker(latLng) {
 }
 
 function startExploring() {
+    console.log("startExploring called. Current exploring state:", exploring);
+    
     if (!exploring) {
         exploring = true;
+        console.log("Exploration started");
         updateStatus("Started exploring. Current and new locations will reveal hexagons.");
+        
         if (userMarker) {
+            console.log("User marker exists, revealing initial hexagon");
             revealHexagonAtPosition(userMarker.getPosition());
         } else {
+            console.log("User marker not set");
             updateStatus("Warning: User marker not set. Unable to reveal initial hexagon.");
         }
+        
         watchId = navigator.geolocation.watchPosition(updateUserPosition, handleLocationError, {
             enableHighAccuracy: true,
             maximumAge: 0,
             timeout: 5000
         });
+        
         document.getElementById('startExploring').textContent = 'Stop Exploring';
     } else {
         stopExploring();
@@ -229,32 +222,50 @@ function refreshExploring() {
 }
 
 function updateUserPosition(position) {
+    console.log("updateUserPosition called with:", position.coords.latitude, position.coords.longitude);
+    
     var latLng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
     placeUserMarker(latLng);
     map.panTo(latLng);
+    
     if (exploring) {
+        console.log("Exploring is true, calling revealHexagonAtPosition");
         revealHexagonAtPosition(latLng);
+    } else {
+        console.log("Exploring is false, not revealing hexagon");
     }
+    
     updateStatus("User position updated: " + latLng.lat() + ", " + latLng.lng());
 }
 
 function revealHexagonAtPosition(latLng) {
-    if (!hexGrid.getProjection()) {
-        updateStatus("Error: Hex grid projection not ready");
+    console.log("revealHexagonAtPosition called with:", latLng.lat(), latLng.lng());
+
+    if (!hexGrid || !hexGrid.getProjection()) {
+        console.error("Error: Hex grid or projection not ready");
         return;
     }
+
     var pixel = hexGrid.getProjection().fromLatLngToDivPixel(latLng);
+    console.log("Pixel coordinates:", pixel.x, pixel.y);
+
     var svgPoint = hexGrid.svg.node().createSVGPoint();
     svgPoint.x = pixel.x;
     svgPoint.y = pixel.y;
 
     var hexagons = hexGrid.svg.selectAll('.hexagon');
+    console.log("Total hexagons:", hexagons.size());
+
     var revealedHexagon = null;
 
-    hexagons.each(function() {
+    hexagons.each(function(d, i) {
         var hexPath = d3.select(this);
-        if (d3.polygonContains(hexPath.node().getAttribute('d').split(/[ML]/).slice(1).map(d => d.split(',')), [svgPoint.x, svgPoint.y])) {
+        var pathData = hexPath.attr('d');
+        var points = pathData.split(/[ML]/).slice(1).map(p => p.split(',').map(parseFloat));
+        
+        if (d3.polygonContains(points, [svgPoint.x, svgPoint.y])) {
             revealedHexagon = this;
+            console.log("Found containing hexagon:", this.id);
             return false; // Exit the loop early
         }
     });
@@ -262,8 +273,10 @@ function revealHexagonAtPosition(latLng) {
     if (revealedHexagon) {
         d3.select(revealedHexagon).classed("revealed", true);
         revealedHexagons.add(revealedHexagon.id);
+        console.log("Revealed hexagon:", revealedHexagon.id);
         updateStatus("Revealed hexagon: " + revealedHexagon.id);
     } else {
+        console.log("No hexagon found at position");
         updateStatus("No hexagon found at position: " + latLng.lat() + ", " + latLng.lng());
     }
 }
