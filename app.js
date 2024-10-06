@@ -1,5 +1,5 @@
 var map;
-var HEXAGON_DIAMETER_METERS = 100;
+var HEXAGON_DIAMETER_METERS = 100; // 100 meters for the diameter
 var hexGrid;
 var revealedHexagons = new Set();
 var userMarker;
@@ -66,7 +66,9 @@ function initMap() {
 
             var center = map.getCenter();
             var pixelsPerMeter = this.getPixelsPerMeter(center.lat());
-            var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter * Math.pow(2, map.getZoom() - baseZoom);
+
+            // Lock the hex radius based on a fixed 100 meters
+            var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter;
 
             var hexbin = d3.hexbin()
                 .radius(hexRadius)
@@ -87,6 +89,7 @@ function initMap() {
                 .attr("class", "hexagon")
                 .attr("id", function(d, i) { return "hex-" + i; });
 
+            // Reapply revealed class to previously visited hexagons
             revealedHexagons.forEach(function(id) {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
