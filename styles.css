@@ -15,49 +15,32 @@ body, html {
 #map {
     height: 100%;
     width: 100%;
+    pointer-events: none;
 }
 
 #hexSvg {
     position: absolute;
     top: 0;
     left: 0;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .hexagon {
     fill: rgba(128, 128, 128, 0.9);
     stroke: #4d4d4d;
     stroke-width: 1px;
+    pointer-events: all;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.hexagon:hover {
+    fill: rgba(100, 100, 100, 0.9);
 }
 
 .revealed {
     fill-opacity: 0;
-}
-
-#controls {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    display: flex;
-    justify-content: center;
-    width: 100%;
-}
-
-#controls button {
-    margin: 0 5px;
-    padding: 10px 20px;
-    font-size: 16px;
-    cursor: pointer;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-}
-
-#controls button:hover {
-    background-color: #45a049;
+    pointer-events: none;
 }
 
 #debug {

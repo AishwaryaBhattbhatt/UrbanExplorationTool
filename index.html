@@ -1,50 +1,33 @@
-
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=no, user-scalable=no">
-                <title>Hexplore: Gamified Map Exploration</title>
-                <link rel="stylesheet" href="styles.css">
-                <script src="https://d3js.org/d3.v7.min.js"></script>
-                <script src="https://d3js.org/d3-hexbin.v0.2.min.js"></script>
-            </head>
-            <body>
-                <div id="app">
-                    <div id="map"></div>
-                    <div id="controls">
-                        <button id="startExploring">Start Exploring</button>
-                        <button id="refreshExploring">Refresh Exploring</button>
-                    </div>
-                </div>
-                <div id="debug">
-                    <p id="status">Status: Loading scripts...</p>
-                </div>
-                <script src="app.js"></script>
-                <script>
-                    // Function to load Google Maps API and handle errors
-                    function loadGoogleMapsAPI() {
-                        var script = document.createElement('script');
-                        script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap';
-                        script.async = true;
-                        script.defer = true;
-                        script.onerror = function() {
-                            updateStatus('Error: Failed to load Google Maps API. Check your API key.');
-                            console.error('Error loading Google Maps API. Check your API key.');
-                        };
-                        document.head.appendChild(script);
-                    }
-            
-                    document.addEventListener('DOMContentLoaded', function() {
-                        try {
-                            loadGoogleMapsAPI();
-                            updateStatus('Google Maps API script loading initiated.');
-                        } catch (e) {
-                            updateStatus('Error during Google Maps API initialization: ' + e.message);
-                            console.error('Error during Google Maps API initialization:', e);
-                        }
-                    });
-                </script>
-            </body>
-            </html>
-            
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hexplore: Gamified Map Exploration</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d3-hexbin.v0.2.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div id="map"></div>
+    </div>
+    <div id="debug">
+        <p id="status">Status: Loading scripts...</p>
+    </div>
+    <script src="app.js"></script>
+    <script>
+        function loadGoogleMapsAPI() {
+            var script = document.createElement('script');
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap';
+            script.async = true;
+            script.defer = true;
+            script.onerror = function() {
+                document.getElementById('status').textContent = 'Error: Failed to load Google Maps API. Check your API key.';
+            };
+            document.head.appendChild(script);
+        }
+        window.onload = loadGoogleMapsAPI;
+    </script>
+</body>
+</html>
