@@ -48,28 +48,28 @@ function initMap() {
                 updateStatus("Error: SVG not initialized");
                 return;
             }
-        
-            // Do not remove the SVG contents; we keep the grid static
+            
+            // Do not redraw the hexagons, lock them in place.
             if (this.svg.selectAll("path").size() > 0) {
                 updateStatus("Grid already drawn, skipping redraw.");
                 return;
             }
-        
+
             var overlayProjection = this.getProjection();
             var bounds = map.getBounds();
             var ne = bounds.getNorthEast();
             var sw = bounds.getSouthWest();
-        
+
             var center = map.getCenter();
             var pixelsPerMeter = this.getPixelsPerMeter(center.lat());
-        
+
             // Lock hexRadius to be based on 100 meters and fixed, not scaling with zoom
             var hexRadius = (HEXAGON_DIAMETER_METERS / 2) * pixelsPerMeter;
-        
+
             var hexbin = d3.hexbin()
                 .radius(hexRadius)
                 .extent([[sw.lng(), sw.lat()], [ne.lng(), ne.lat()]]); // use lat/lng for extent
-        
+
             // Create a hexagonal grid based on map's bounds (lat/lng)
             var points = [];
             for (var x = sw.lng(); x <= ne.lng(); x += (HEXAGON_DIAMETER_METERS / 1000) * 1.5) {
@@ -77,37 +77,29 @@ function initMap() {
                     points.push([x, y]);
                 }
             }
-        
+
             var hexagons = this.svg.selectAll("path")
                 .data(hexbin(points))
                 .enter().append("path")
-                .attr("d", function(d) { return "M" + overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d.y, d.x)).x + "," + overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d.y, d.x)).y + hexbin.hexagon(); })
+                .attr("d", function(d) { 
+                    var point = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(d[1], d[0]));
+                    return "M" + point.x + "," + point.y + hexbin.hexagon(); 
+                })
                 .attr("class", "hexagon")
                 .attr("id", function(d, i) { return "hex-" + i; });
-        
-            // Reapply revealed class to previously visited hexagons
+
+            // Apply transformation to hexagons on zoom
+            map.addListener("zoom_changed", function() {
+                var zoomScale = Math.pow(2, map.getZoom() - baseZoom);
+                d3.selectAll(".hexagon").attr("transform", "scale(" + zoomScale + ")");
+            });
+
             revealedHexagons.forEach(function(id) {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
-        
+
             updateStatus("Hex grid drawn. Total hexagons: " + hexagons.size());
         };
-        
-        hexGrid.getPixelsPerMeter = function(latitude) {
-            return this.getProjection().getWorldWidth() / (40075016.686 * Math.cos(latitude * Math.PI / 180));
-        };
-        
-        // Event listeners
-        google.maps.event.addListener(map, 'zoom_changed', function() {
-            updateStatus("Zoom changed. Keeping grid static.");
-            hexGrid.draw(); // This ensures that the hexagons stay in place during zoom
-        });
-        
-        google.maps.event.addListener(map, 'dragend', function() {
-            updateStatus("Drag ended. Keeping grid static.");
-            hexGrid.draw(); // Ensures hexagons remain static on drag
-        });
-        
 
         hexGrid.getPixelsPerMeter = function(latitude) {
             return this.getProjection().getWorldWidth() / (40075016.686 * Math.cos(latitude * Math.PI / 180));
@@ -121,8 +113,7 @@ function initMap() {
         });
 
         google.maps.event.addListener(map, 'bounds_changed', function() {
-            updateStatus("Bounds changed. Redrawing hex grid...");
-            hexGrid.draw();
+            updateStatus("Bounds changed. Keeping hex grid in place.");
         });
 
         var startExploringBtn = document.getElementById('startExploring');
