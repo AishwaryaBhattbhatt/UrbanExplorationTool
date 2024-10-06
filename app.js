@@ -243,37 +243,28 @@ function revealHexagonAtPosition(latLng) {
         updateStatus("Error: Hex grid projection not ready");
         return;
     }
-    var pixel = hexGrid.getProjection().fromLatLngToContainerPixel(latLng);
+    var pixel = hexGrid.getProjection().fromLatLngToDivPixel(latLng);
     var svgPoint = hexGrid.svg.node().createSVGPoint();
     svgPoint.x = pixel.x;
     svgPoint.y = pixel.y;
-    var hexagon = document.elementFromPoint(pixel.x, pixel.y);
-    
-    if (hexagon && hexagon.classList.contains('hexagon')) {
-        hexagon.classList.add("revealed");
-        revealedHexagons.add(hexagon.id);
-        updateStatus("Revealed hexagon: " + hexagon.id);
-    } else {
-        // If no hexagon is found at the exact point, search nearby
-        var nearbyHexagons = hexGrid.svg.selectAll('.hexagon').filter(function() {
-            var bbox = this.getBBox();
-            var hexCenter = {
-                x: bbox.x + bbox.width / 2,
-                y: bbox.y + bbox.height / 2
-            };
-            var distance = Math.sqrt(Math.pow(hexCenter.x - svgPoint.x, 2) + Math.pow(hexCenter.y - svgPoint.y, 2));
-            return distance <= HEXAGON_DIAMETER_METERS / 2;
-        });
-        
-        if (!nearbyHexagons.empty()) {
-            nearbyHexagons.classed("revealed", true);
-            nearbyHexagons.each(function() {
-                revealedHexagons.add(this.id);
-                updateStatus("Revealed nearby hexagon: " + this.id);
-            });
-        } else {
-            updateStatus("No hexagon found near position: " + latLng.lat() + ", " + latLng.lng());
+
+    var hexagons = hexGrid.svg.selectAll('.hexagon');
+    var revealedHexagon = null;
+
+    hexagons.each(function() {
+        var hexPath = d3.select(this);
+        if (d3.polygonContains(hexPath.node().getAttribute('d').split(/[ML]/).slice(1).map(d => d.split(',')), [svgPoint.x, svgPoint.y])) {
+            revealedHexagon = this;
+            return false; // Exit the loop early
         }
+    });
+
+    if (revealedHexagon) {
+        d3.select(revealedHexagon).classed("revealed", true);
+        revealedHexagons.add(revealedHexagon.id);
+        updateStatus("Revealed hexagon: " + revealedHexagon.id);
+    } else {
+        updateStatus("No hexagon found at position: " + latLng.lat() + ", " + latLng.lng());
     }
 }
 
