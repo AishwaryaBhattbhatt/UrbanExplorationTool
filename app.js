@@ -4,6 +4,7 @@ var hexGrid;
 var revealedHexagons = new Set();
 var lastKnownPosition = null;
 var POSITION_CHANGE_THRESHOLD = 0.001; // Threshold for significant change in geolocation
+var startExploringButton;
 
 function initMap() {
     updateStatus("Initializing map...");
@@ -96,9 +97,21 @@ function initMap() {
 
         hexGrid.setMap(map);
 
-        google.maps.event.addListenerOnce(map, 'idle', function() {
-            updateStatus("Map idle. Requesting geolocation...");
+        // Add Start Exploring Button
+        startExploringButton = document.createElement("button");
+        startExploringButton.textContent = "Start Exploring";
+        startExploringButton.style.position = "fixed";
+        startExploringButton.style.bottom = "20px";
+        startExploringButton.style.left = "20px";
+        startExploringButton.style.zIndex = 1000;
+        document.body.appendChild(startExploringButton);
+        startExploringButton.addEventListener("click", function() {
+            updateStatus("Start exploring clicked. Requesting geolocation...");
             requestGeolocation();
+        });
+
+        google.maps.event.addListenerOnce(map, 'idle', function() {
+            updateStatus("Map idle. Ready to explore.");
         });
 
         let debounceTimer;
@@ -118,7 +131,7 @@ function initMap() {
 
 function requestGeolocation() {
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
+        navigator.geolocation.watchPosition(
             function(position) {
                 var latitude = position.coords.latitude;
                 var longitude = position.coords.longitude;
@@ -134,9 +147,8 @@ function requestGeolocation() {
 
                 lastKnownPosition = { latitude: latitude, longitude: longitude };
 
-                updateStatus("Geolocation received. Centering map...");
+                updateStatus("Geolocation updated. Centering map and revealing new hexagon...");
                 map.setCenter({ lat: latitude, lng: longitude });
-                map.setZoom(15);
                 revealHexagonsAroundPosition(latitude, longitude);
                 hexGrid.draw();
             },
