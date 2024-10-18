@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://d3js.org/d3-hexbin.v0.2.min.js"></script>
+
 </head>
 <body>
     <div id="app">
@@ -28,6 +29,30 @@
             document.head.appendChild(script);
         }
         window.onload = loadGoogleMapsAPI;
+    </script>
+
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-analytics.js";
+        // TODO: Add SDKs for Firebase products that you want to use
+        // https://firebase.google.com/docs/web/setup#available-libraries
+    
+        // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+        apiKey: "AIzaSyBLrW-5ZcS8PQjFGT6zLBJjbg4U9rbvyjU",
+        authDomain: "project-urbanexp.firebaseapp.com",
+        projectId: "project-urbanexp",
+        storageBucket: "project-urbanexp.appspot.com",
+        messagingSenderId: "474295507409",
+        appId: "1:474295507409:web:e618fe1c89d2de156668f0",
+        measurementId: "G-P2MEMM6P6G"
+        };
+    
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
     </script>
 </body>
 </html>
