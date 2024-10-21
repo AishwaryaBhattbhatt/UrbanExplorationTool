@@ -1,4 +1,5 @@
 var map;
+var userMarker;
 var HEXAGON_DIAMETER_METERS = 100;
 var hexGrid;
 var revealedHexagons = new Set();
@@ -10,8 +11,8 @@ function initMap() {
             center: { lat: 0, lng: 0 },
             zoom: 15,
             disableDefaultUI: true,
-            gestureHandling: 'none',
-            zoomControl: false,
+            gestureHandling: 'auto',
+            zoomControl: true,
             styles: [
                 {
                     featureType: "poi",
@@ -24,11 +25,8 @@ function initMap() {
             ]
         });
 
-        updateStatus("Map object created. Setting up hex grid...");
-
         hexGrid = new google.maps.OverlayView();
         hexGrid.onAdd = function() {
-            updateStatus("Hex grid onAdd called.");
             var svg = d3.select(this.getPanes().overlayMouseTarget).append("svg")
                 .attr("id", "hexSvg")
                 .style("position", "absolute");
@@ -36,11 +34,7 @@ function initMap() {
         };
 
         hexGrid.draw = function() {
-            updateStatus("Drawing hex grid...");
-            if (!this.svg) {
-                updateStatus("Error: SVG not initialized");
-                return;
-            }
+            if (!this.svg) return;
             this.svg.selectAll("*").remove();
             var overlayProjection = this.getProjection();
             var bounds = map.getBounds();
@@ -73,7 +67,7 @@ function initMap() {
                 }
             }
 
-            var hexagons = this.svg.selectAll("path")
+            this.svg.selectAll("path")
                 .data(hexbin(points))
                 .enter().append("path")
                 .attr("d", function(d) { return "M" + d.x + "," + d.y + hexbin.hexagon(); })
@@ -85,8 +79,6 @@ function initMap() {
             revealedHexagons.forEach(function(id) {
                 this.svg.select("#" + id).classed("revealed", true);
             }.bind(this));
-
-            updateStatus("Hex grid drawn.");
         };
 
         hexGrid.getPixelsPerMeter = function(latitude) {
@@ -96,12 +88,10 @@ function initMap() {
         hexGrid.setMap(map);
 
         google.maps.event.addListenerOnce(map, 'idle', function() {
-            updateStatus("Map idle. Requesting geolocation...");
             requestGeolocation();
         });
 
         google.maps.event.addListener(map, 'bounds_changed', function() {
-            updateStatus("Bounds changed. Redrawing hex grid...");
             hexGrid.draw();
         });
 
@@ -115,12 +105,34 @@ function requestGeolocation() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                updateStatus("Geolocation received. Centering map...");
                 var latitude = position.coords.latitude;
                 var longitude = position.coords.longitude;
-                map.setCenter({ lat: latitude, lng: longitude });
+                var userLatLng = { lat: latitude, lng: longitude };
+
+                map.setCenter(userLatLng);
                 map.setZoom(15);
                 hexGrid.draw();
+
+                // Add a marker to show the user's location
+                if (userMarker) {
+                    userMarker.setPosition(userLatLng);
+                } else {
+                    userMarker = new google.maps.Marker({
+                        position: userLatLng,
+                        map: map,
+                        title: "Your Location",
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 7,
+                            fillColor: '#4285F4',
+                            fillOpacity: 1,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 2
+                        }
+                    });
+                }
+
+                updateStatus("Geolocation received. Centering map...");
             },
             function(error) {
                 updateStatus("Geolocation error: " + error.message);
@@ -132,20 +144,3 @@ function requestGeolocation() {
         hexGrid.draw();
     }
 }
-
-function handleHexagonInteraction(event, d) {
-    event.preventDefault();
-    event.stopPropagation();
-    var hexId = d3.select(this).attr("id");
-    d3.select(this).classed("revealed", true);
-    revealedHexagons.add(hexId);
-    updateStatus("Hexagon revealed: " + hexId);
-}
-
-function updateStatus(message) {
-    console.log(message);
-    document.getElementById("status").textContent = "Status: " + message;
-}
-
-// Add this line to check if the script is loaded
-console.log("app.js loaded and parsed");
