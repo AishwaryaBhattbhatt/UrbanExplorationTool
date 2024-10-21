@@ -1,3 +1,6 @@
+
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap';
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,7 +24,7 @@
     <script src="app.js"></script>
     <script>
         function loadGoogleMapsAPI() {
-            var script = document.createElement('script');
+            const script = document.createElement('script');
             script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyDR3nhIW56taOqanoBa0I4nVJiiUvQylf4&callback=initMap';
             script.async = true;
             script.defer = true;

@@ -10,8 +10,8 @@ function initMap() {
             center: { lat: 0, lng: 0 },
             zoom: 15,
             disableDefaultUI: true,
-            gestureHandling: 'none',
-            zoomControl: false,
+            gestureHandling: 'greedy', // Allow gestures on mobile devices
+            zoomControl: true,
             styles: [
                 {
                     featureType: "poi",
@@ -24,11 +24,8 @@ function initMap() {
             ]
         });
 
-        updateStatus("Map object created. Setting up hex grid...");
-
         hexGrid = new google.maps.OverlayView();
         hexGrid.onAdd = function() {
-            updateStatus("Hex grid onAdd called.");
             var svg = d3.select(this.getPanes().overlayMouseTarget).append("svg")
                 .attr("id", "hexSvg")
                 .style("position", "absolute");
@@ -36,11 +33,7 @@ function initMap() {
         };
 
         hexGrid.draw = function() {
-            updateStatus("Drawing hex grid...");
-            if (!this.svg) {
-                updateStatus("Error: SVG not initialized");
-                return;
-            }
+            if (!this.svg) return;
             this.svg.selectAll("*").remove();
             var overlayProjection = this.getProjection();
             var bounds = map.getBounds();
@@ -73,20 +66,18 @@ function initMap() {
                 }
             }
 
-            var hexagons = this.svg.selectAll("path")
+            this.svg.selectAll("path")
                 .data(hexbin(points))
                 .enter().append("path")
-                .attr("d", function(d) { return "M" + d.x + "," + d.y + hexbin.hexagon(); })
+                .attr("d", d => "M" + d.x + "," + d.y + hexbin.hexagon())
                 .attr("class", "hexagon")
-                .attr("id", function(d, i) { return "hex-" + i; })
-                .on("mousedown", handleHexagonInteraction)
+                .attr("id", (d, i) => "hex-" + i)
+                .on("click", handleHexagonInteraction)
                 .on("touchstart", handleHexagonInteraction);
 
-            revealedHexagons.forEach(function(id) {
+            revealedHexagons.forEach(id => {
                 this.svg.select("#" + id).classed("revealed", true);
-            }.bind(this));
-
-            updateStatus("Hex grid drawn.");
+            });
         };
 
         hexGrid.getPixelsPerMeter = function(latitude) {
@@ -95,19 +86,11 @@ function initMap() {
 
         hexGrid.setMap(map);
 
-        google.maps.event.addListenerOnce(map, 'idle', function() {
-            updateStatus("Map idle. Requesting geolocation...");
-            requestGeolocation();
-        });
-
-        google.maps.event.addListener(map, 'bounds_changed', function() {
-            updateStatus("Bounds changed. Redrawing hex grid...");
-            hexGrid.draw();
-        });
+        google.maps.event.addListenerOnce(map, 'idle', requestGeolocation);
+        google.maps.event.addListener(map, 'bounds_changed', () => hexGrid.draw());
 
     } catch (error) {
         updateStatus("Error initializing map: " + error.message);
-        console.error("Map initialization error:", error);
     }
 }
 
@@ -115,17 +98,15 @@ function requestGeolocation() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                updateStatus("Geolocation received. Centering map...");
-                var latitude = position.coords.latitude;
-                var longitude = position.coords.longitude;
-                map.setCenter({ lat: latitude, lng: longitude });
+                map.setCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
                 map.setZoom(15);
                 hexGrid.draw();
             },
-            function(error) {
-                updateStatus("Geolocation error: " + error.message);
+            function() {
+                updateStatus("Geolocation permission denied or unavailable.");
                 hexGrid.draw();
-            }
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     } else {
         updateStatus("Geolocation not supported by this browser.");
@@ -133,19 +114,14 @@ function requestGeolocation() {
     }
 }
 
-function handleHexagonInteraction(event, d) {
+function handleHexagonInteraction(event) {
     event.preventDefault();
-    event.stopPropagation();
     var hexId = d3.select(this).attr("id");
     d3.select(this).classed("revealed", true);
     revealedHexagons.add(hexId);
-    updateStatus("Hexagon revealed: " + hexId);
 }
 
 function updateStatus(message) {
     console.log(message);
     document.getElementById("status").textContent = "Status: " + message;
 }
-
-// Add this line to check if the script is loaded
-console.log("app.js loaded and parsed");
