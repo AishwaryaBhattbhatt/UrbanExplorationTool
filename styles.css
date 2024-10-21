@@ -56,16 +56,10 @@ body, html {
     max-width: 80%;
 }
 
-@media (max-width: 600px) {
-    #debug {
-        font-size: 12px;
-        padding: 5px;
-    }
-}
-
+/* Instructions styling */
 #instructions {
     position: fixed;
-    bottom: 50px;
+    top: 10px; /* Changed to top to avoid overlapping with the debug/status div */
     left: 50%;
     transform: translateX(-50%);
     background-color: rgba(0, 0, 0, 0.7);
@@ -73,14 +67,22 @@ body, html {
     padding: 10px 20px;
     border-radius: 5px;
     font-family: Arial, sans-serif;
-    z-index: 1001;
+    z-index: 1001; /* Ensure it stays above other elements */
     font-size: 14px;
     text-align: center;
+    max-width: 90%;
 }
 
+/* Adjust styles for small screens */
 @media (max-width: 600px) {
+    #debug {
+        font-size: 12px;
+        padding: 5px;
+    }
+
     #instructions {
         font-size: 12px;
         padding: 8px 15px;
+        top: 5px; /* Reduce the distance from the top for small screens */
     }
 }
